@@ -1,24 +1,12 @@
 import os
-import zmq
-from cereal import car
 from common.params import Params
 from common.basedir import BASEDIR
 from selfdrive.car.fingerprints import eliminate_incompatible_cars, all_known_cars
 from selfdrive.car.vin import get_vin, VIN_UNKNOWN
+from selfdrive.car.fw_versions import get_fw_versions
 from selfdrive.swaglog import cloudlog
-import selfdrive.messaging as messaging
+import cereal.messaging as messaging
 from selfdrive.car import gen_empty_fingerprint
-
-
-def get_one_can(logcan):
-  while True:
-    try:
-      can = messaging.recv_one(logcan)
-      if len(can.can) > 0:
-        return can
-    except zmq.error.Again:
-      continue
-
 
 def get_startup_alert(car_recognized, controller_available):
   alert = 'startup'
@@ -69,18 +57,14 @@ def only_toyota_left(candidate_cars):
 # BOUNTY: every added fingerprint in selfdrive/car/*/values.py is a $100 coupon code on shop.comma.ai
 # **** for use live only ****
 def fingerprint(logcan, sendcan, has_relay):
-  params = Params()
-  car_params = params.get("CarParams")
-
-  if car_params is not None:
-    # use already stored VIN: a new VIN query cannot be done, since panda isn't in ELM327 mode
-    car_params = car.CarParams.from_bytes(car_params)
-    vin = VIN_UNKNOWN if car_params.carVin == "" else car_params.carVin
-  elif has_relay:
+  if has_relay:
     # Vin query only reliably works thorugh OBDII
-    vin = get_vin(logcan, sendcan, 1)
+    bus = 1
+    addr, vin = get_vin(logcan, sendcan, bus)
+    _, car_fw = get_fw_versions(logcan, sendcan, bus)
   else:
     vin = VIN_UNKNOWN
+    _, car_fw = set(), []
 
   cloudlog.warning("VIN %s", vin)
   Params().put("CarVin", vin)
@@ -93,7 +77,7 @@ def fingerprint(logcan, sendcan, has_relay):
   done = False
 
   while not done:
-    a = get_one_can(logcan)
+    a = messaging.get_one_can(logcan)
 
     for can in a.can:
       # need to independently try to fingerprint both bus 0 and 1 to work
@@ -127,18 +111,19 @@ def fingerprint(logcan, sendcan, has_relay):
     frame += 1
 
   cloudlog.warning("fingerprinted %s", car_fingerprint)
-  return car_fingerprint, finger, vin
+  return car_fingerprint, finger, vin, car_fw
 
 
 def get_car(logcan, sendcan, has_relay=False):
-
-  candidate, fingerprints, vin = fingerprint(logcan, sendcan, has_relay)
+  candidate, fingerprints, vin, car_fw = fingerprint(logcan, sendcan, has_relay)
 
   if candidate is None:
     cloudlog.warning("car doesn't match any fingerprints: %r", fingerprints)
     candidate = "mock"
 
   CarInterface, CarController = interfaces[candidate]
-  car_params = CarInterface.get_params(candidate, fingerprints, vin, has_relay)
+  car_params = CarInterface.get_params(candidate, fingerprints, has_relay, car_fw)
+  car_params.carVin = vin
+  car_params.carFw = car_fw
 
   return CarInterface(car_params, CarController), car_params
