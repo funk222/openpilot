@@ -49,7 +49,7 @@ class CarInterface(CarInterfaceBase):
 
     ret.enableCruise = True
 
-    ret.steerActuatorDelay = 0.12  # Default delay, Prius has larger delay
+    ret.steerActuatorDelay = 0.05  # Default delay 0.12, Prius has larger delay
     ret.steerLimitTimer = 0.4
 
     if candidate not in [CAR.PRIUS, CAR.RAV4, CAR.RAV4H]: # These cars use LQR/INDI
