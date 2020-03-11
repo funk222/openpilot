@@ -49,7 +49,7 @@ class CarInterface(CarInterfaceBase):
 
     ret.enableCruise = True
 
-    ret.steerActuatorDelay = 0.12  # Default delay, Prius has larger delay
+    ret.steerActuatorDelay = 0.025  # Default delay 0.12, Prius has larger delay
     ret.steerLimitTimer = 0.4
 
     if candidate not in [CAR.PRIUS, CAR.RAV4, CAR.RAV4H]: # These cars use LQR/INDI
@@ -276,10 +276,10 @@ class CarInterface(CarInterfaceBase):
     elif candidate == CAR.OLD_CAR:
       stop_and_go = True
       ret.safetyParam = 100
-      ret.wheelbase = 2.455
-      ret.steerRatio = 13.0
+      ret.wheelbase = 3.0
+      ret.steerRatio = 14.0
       tire_stiffness_factor = 0.444
-      ret.mass = 6200.0
+      ret.mass = 4730.0
       ret.lateralTuning.pid.kpV, ret.lateralTuning.pid.kiV = [[0.3], [0.05]]
       ret.lateralTuning.pid.kf = 0.00003 # full torque for 20 deg at 80mph means 0.00007818594
 
