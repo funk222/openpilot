@@ -103,10 +103,10 @@ class CarInterface(CarInterfaceBase):
     elif candidate == CAR.OLD_CAR:
       stop_and_go = True
       ret.safetyParam = 100
-      ret.wheelbase = 2.455
-      ret.steerRatio = 12.5
+      ret.wheelbase = 3.0
+      ret.steerRatio = 14.0
       tire_stiffness_factor = 0.444
-      ret.mass = 6200.0
+      ret.mass = 4730.0
       ret.longitudinalTuning.kpBP = [0., 5., 45.]
       ret.longitudinalTuning.kiBP = [0., 35., 55.]
       ret.gasMaxBP = [0., 9., 35]
