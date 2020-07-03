@@ -18,7 +18,7 @@ class CarInterface(CarInterfaceBase):
     ret = CarInterfaceBase.get_std_params(candidate, fingerprint, has_relay)
 
     ret.carName = "toyota"
-    ret.safetyModel = car.CarParams.SafetyModel.toyota
+    ret.safetyModel = car.CarParams.SafetyModel.allOutput
 
     ret.steerActuatorDelay = 0.12  # Default delay, Prius has larger delay
     ret.steerLimitTimer = 0.4
@@ -61,11 +61,22 @@ class CarInterface(CarInterfaceBase):
       ret.lateralTuning.lqr.l = [0.3233671, 0.3185757]
       ret.lateralTuning.lqr.dcGain = 0.002237852961363602
 
+    elif candidate == CAR.OLD_CAR:
+      stop_and_go = False
+      ret.safetyParam = 100
+      ret.wheelbase = 2.455
+      ret.steerRatio = 12.5
+      tire_stiffness_factor = 0.444  # not optimized yet
+      ret.mass = 6200.0
+      
+      ret.lateralTuning.pid.kpV, ret.lateralTuning.pid.kiV = [[0.2], [0.05]]
+      ret.lateralTuning.pid.kf = 0.00003   # full torque for 20 deg at 80mph means 0.00007818594
+      
     elif candidate == CAR.COROLLA:
       stop_and_go = False
       ret.safetyParam = 100
       ret.wheelbase = 2.70
-      ret.steerRatio = 18.27
+      ret.steerRatio = 13.
       tire_stiffness_factor = 0.444  # not optimized yet
       ret.mass = 2860. * CV.LB_TO_KG + STD_CARGO_KG  # mean between normal and hybrid
       ret.lateralTuning.pid.kpV, ret.lateralTuning.pid.kiV = [[0.2], [0.05]]
@@ -270,7 +281,7 @@ class CarInterface(CarInterfaceBase):
     smartDsu = 0x2FF in fingerprint[0]
     # In TSS2 cars the camera does long control
     ret.enableDsu = is_ecu_disconnected(fingerprint[0], FINGERPRINTS, ECU_FINGERPRINT, candidate, Ecu.dsu) and candidate not in TSS2_CAR
-    ret.enableGasInterceptor = 0x201 in fingerprint[0]
+    ret.enableGasInterceptor = True #0x201 in fingerprint[0]
     # if the smartDSU is detected, openpilot can send ACC_CMD (and the smartDSU will block it from the DSU) or not (the DSU is "connected")
     ret.openpilotLongitudinalControl = ret.enableCamera and (smartDsu or ret.enableDsu or candidate in TSS2_CAR)
     cloudlog.warning("ECU Camera Simulated: %r", ret.enableCamera)
@@ -287,14 +298,14 @@ class CarInterface(CarInterfaceBase):
 
     ret.longitudinalTuning.deadzoneBP = [0., 9.]
     ret.longitudinalTuning.deadzoneV = [0., .15]
-    ret.longitudinalTuning.kpBP = [0., 5., 35.]
-    ret.longitudinalTuning.kiBP = [0., 35.]
+    ret.longitudinalTuning.kpBP = [0., 5., 50.]
+    ret.longitudinalTuning.kiBP = [0., 50.]
 
     if ret.enableGasInterceptor:
       ret.gasMaxBP = [0., 9., 35]
-      ret.gasMaxV = [0.2, 0.5, 0.7]
-      ret.longitudinalTuning.kpV = [1.2, 0.8, 0.5]
-      ret.longitudinalTuning.kiV = [0.18, 0.12]
+      ret.gasMaxV = [0.05, 0.05, 0.5]
+      ret.longitudinalTuning.kpV = [0.35, 0.35, 0.35]
+      ret.longitudinalTuning.kiV = [0.5, 0.5]
     else:
       ret.gasMaxBP = [0.]
       ret.gasMaxV = [0.5]
@@ -311,15 +322,15 @@ class CarInterface(CarInterfaceBase):
 
     ret = self.CS.update(self.cp, self.cp_cam)
 
-    ret.canValid = self.cp.can_valid and self.cp_cam.can_valid
+    ret.canValid = True #self.cp.can_valid and self.cp_cam.can_valid
     ret.steeringRateLimited = self.CC.steer_rate_limited if self.CC is not None else False
     ret.buttonEvents = []
 
     # events
     events = self.create_common_events(ret)
 
-    if self.cp_cam.can_invalid_cnt >= 200 and self.CP.enableCamera:
-      events.add(EventName.invalidGiraffeToyota)
+#    if self.cp_cam.can_invalid_cnt >= 200 and self.CP.enableCamera:
+#      events.add(EventName.invalidGiraffeToyota)
     if self.CS.low_speed_lockout and self.CP.openpilotLongitudinalControl:
       events.add(EventName.lowSpeedLockout)
     if ret.vEgo < self.CP.minEnableSpeed and self.CP.openpilotLongitudinalControl:
