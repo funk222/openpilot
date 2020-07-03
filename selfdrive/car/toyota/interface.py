@@ -65,7 +65,7 @@ class CarInterface(CarInterfaceBase):
       stop_and_go = False
       ret.safetyParam = 100
       ret.wheelbase = 2.455
-      ret.steerRatio = 12.5
+      ret.steerRatio = 13.5
       tire_stiffness_factor = 0.444  # not optimized yet
       ret.mass = 6200.0
       
