@@ -79,7 +79,7 @@ class CarInterface(CarInterfaceBase):
       ret.steerRatio = 13.
       tire_stiffness_factor = 0.444  # not optimized yet
       ret.mass = 2860. * CV.LB_TO_KG + STD_CARGO_KG  # mean between normal and hybrid
-      ret.lateralTuning.pid.kpV, ret.lateralTuning.pid.kiV = [[0.2], [0.05]]
+      ret.lateralTuning.pid.kpV, ret.lateralTuning.pid.kiV = [[0.15], [0.6]]
       ret.lateralTuning.pid.kf = 0.00003   # full torque for 20 deg at 80mph means 0.00007818594
 
     elif candidate == CAR.LEXUS_RX:
@@ -304,8 +304,8 @@ class CarInterface(CarInterfaceBase):
     if ret.enableGasInterceptor:
       ret.gasMaxBP = [0., 9., 35]
       ret.gasMaxV = [0.05, 0.05, 0.5]
-      ret.longitudinalTuning.kpV = [0.35, 0.35, 0.35]
-      ret.longitudinalTuning.kiV = [0.5, 0.5]
+      ret.longitudinalTuning.kpV = [0.6, 0.6, 0.6]
+      ret.longitudinalTuning.kiV = [0.01, 0.01]
     else:
       ret.gasMaxBP = [0.]
       ret.gasMaxV = [0.5]
