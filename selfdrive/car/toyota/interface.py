@@ -71,7 +71,7 @@ class CarInterface(CarInterfaceBase):
       stop_and_go = False
       ret.safetyParam = 100
       ret.wheelbase = 3.    # HONDA Odyssey 2005 = 3 m; Ford E350 1997 = 4 m
-      ret.steerRatio = 16.2 # HONDA Odyssey 2005 = 16.2 ; Ford E350 1997 = ~ 17
+      ret.steerRatio = 17 # HONDA Odyssey 2005 = 16.2 ; Ford E350 1997 = ~ 17
       tire_stiffness_factor = 0.444  # not optimized yet
       ret.mass = 4600.   # HONDA Odyssey 2005 = 4600 lb; Ford E350 1997 = 11500 lb
 
