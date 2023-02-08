@@ -71,11 +71,11 @@ class CarInterface(CarInterfaceBase):
       stop_and_go = False
       ret.safetyParam = 100
       ret.wheelbase = 3.    # HONDA Odyssey 2005 = 3 m; Ford E350 1997 = 4 m
-      ret.steerRatio = 16.5 # HONDA Odyssey 2005 = 16.2 ; Ford E350 1997 = ~ 17
+      ret.steerRatio = 16.2 # HONDA Odyssey 2005 = 16.2 ; Ford E350 1997 = ~ 17
       tire_stiffness_factor = 0.444  # not optimized yet
       ret.mass = 4600.   # HONDA Odyssey 2005 = 4600 lb; Ford E350 1997 = 11500 lb
 
-      ret.lateralTuning.pid.kpV, ret.lateralTuning.pid.kiV = [[0.7], [0.01]]
+      ret.lateralTuning.pid.kpV, ret.lateralTuning.pid.kiV = [[0.4], [0.01]]
       ret.lateralTuning.pid.kf = 0.00007818594   # full torque for 20 deg at 80mph means 0.00007818594
 
     elif candidate in [CAR.RAV4, CAR.RAV4H]:
