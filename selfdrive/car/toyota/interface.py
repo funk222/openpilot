@@ -70,12 +70,12 @@ class CarInterface(CarInterfaceBase):
     elif candidate == CAR.OLD_CAR:
       stop_and_go = False
       ret.safetyParam = 100
-      ret.wheelbase = 3.    # HONDA Odyssey 2005 = 3 m; Ford E350 1997 = 4 m
-      ret.steerRatio = 16.2 # HONDA Odyssey 2005 = 16.2 ; Ford E350 1997 = ~ 17
+      ret.wheelbase = 4.    # HONDA Odyssey 2005 = 3 m; Ford E350 1997 = 4 m
+      ret.steerRatio = 17 # HONDA Odyssey 2005 = 16.2 ; Ford E350 1997 = ~ 17
       tire_stiffness_factor = 0.444  # not optimized yet
-      ret.mass = 4600.   # HONDA Odyssey 2005 = 4600 lb; Ford E350 1997 = 11500 lb
+      ret.mass = 11500   # HONDA Odyssey 2005 = 4600 lb; Ford E350 1997 = 11500 lb
 
-      ret.lateralTuning.pid.kpV, ret.lateralTuning.pid.kiV = [[0.2], [0.01]]
+      ret.lateralTuning.pid.kpV, ret.lateralTuning.pid.kiV = [[0.9], [0.01]]  # HONDA Odyssey 2005 = [0.2], [0.01]; Ford E350 1997 = [0.9], [0.01]
       ret.lateralTuning.pid.kf = 0.00007818594   # full torque for 20 deg at 80mph means 0.00007818594
 
     elif candidate in [CAR.RAV4, CAR.RAV4H]:
