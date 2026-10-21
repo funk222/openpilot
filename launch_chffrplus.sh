@@ -89,7 +89,7 @@ function two_init {
   wpa_cli IFNAME=wlan0 SCAN
 
   # Check for NEOS update
-  if [ $(< /VERSION) != "$REQUIRED_NEOS_VERSION" ]; then
+  if [ "$SKIP_NEOS_UPDATE" != "1" ] && [ $(< /VERSION) != "$REQUIRED_NEOS_VERSION" ]; then
     echo "Installing NEOS update"
     NEOS_PY="$DIR/selfdrive/hardware/eon/neos.py"
     MANIFEST="$DIR/selfdrive/hardware/eon/neos.json"

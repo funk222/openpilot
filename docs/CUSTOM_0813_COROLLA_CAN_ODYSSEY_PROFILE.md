@@ -70,3 +70,15 @@ After installation and basic validation, tune in small increments:
 4. `steerActuatorDelay`
 
 Keep one change per run and log behavior per speed band.
+
+## NEOS Update Screen Note (C2 legacy devices)
+
+On older C2/NEOS paths, the stock 0.8.13 `neos.json` URLs can fail at runtime
+with the UI showing **Update Required** then **Update failed**.
+
+For this custom branch, boot-time NEOS mandatory update gating is disabled by default via:
+
+- `SKIP_NEOS_UPDATE=1` in `launch_env.sh`
+- guarded NEOS update check in `launch_chffrplus.sh`
+
+This avoids a hard block at startup when the legacy NEOS OTA endpoint is unavailable.

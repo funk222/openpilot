@@ -10,6 +10,10 @@ if [ -z "$REQUIRED_NEOS_VERSION" ]; then
   export REQUIRED_NEOS_VERSION="19.1"
 fi
 
+if [ -z "$SKIP_NEOS_UPDATE" ]; then
+  export SKIP_NEOS_UPDATE="1"
+fi
+
 if [ -z "$AGNOS_VERSION" ]; then
   export AGNOS_VERSION="4"
 fi
