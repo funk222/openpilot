@@ -2,6 +2,7 @@
 import time
 import json
 import jwt
+import os
 from pathlib import Path
 
 from datetime import datetime, timedelta
@@ -91,7 +92,9 @@ def register(show_spinner=False) -> str:
 
   if dongle_id:
     params.put("DongleId", dongle_id)
-    set_offroad_alert("Offroad_UnofficialHardware", (dongle_id == UNREGISTERED_DONGLE_ID) and not PC)
+    suppress_unofficial_hw_alert = os.getenv("SUPPRESS_UNOFFICIAL_HARDWARE_ALERT", "0") == "1"
+    show_unofficial_hw_alert = (dongle_id == UNREGISTERED_DONGLE_ID) and not PC and not suppress_unofficial_hw_alert
+    set_offroad_alert("Offroad_UnofficialHardware", show_unofficial_hw_alert)
   return dongle_id
 
 

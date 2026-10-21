@@ -22,4 +22,8 @@ if [ -z "$PASSIVE" ]; then
   export PASSIVE="1"
 fi
 
+if [ -z "$SUPPRESS_UNOFFICIAL_HARDWARE_ALERT" ]; then
+  export SUPPRESS_UNOFFICIAL_HARDWARE_ALERT="1"
+fi
+
 export STAGING_ROOT="/data/safe_staging"
