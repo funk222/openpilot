@@ -26,4 +26,14 @@ if [ -z "$SUPPRESS_UNOFFICIAL_HARDWARE_ALERT" ]; then
   export SUPPRESS_UNOFFICIAL_HARDWARE_ALERT="1"
 fi
 
+# Force car fingerprint for custom single-CAN Arduino setup
+# This allows Corolla to be recognized even if CAN message pattern doesn't perfectly match OEM
+if [ -z "$FINGERPRINT" ]; then
+  export FINGERPRINT="TOYOTA COROLLA 2017"
+fi
+
+if [ -z "$SKIP_FW_QUERY" ]; then
+  export SKIP_FW_QUERY="1"
+fi
+
 export STAGING_ROOT="/data/safe_staging"
