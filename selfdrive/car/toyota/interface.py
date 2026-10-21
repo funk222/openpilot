@@ -22,11 +22,16 @@ class CarInterface(CarInterfaceBase):
     ret.safetyConfigs = [get_safety_config(car.CarParams.SafetyModel.toyota)]
     ret.safetyConfigs[0].safetyParam = EPS_SCALE[candidate]
 
+    # Custom single-CAN Toyota builds do not have the split-bus camera/radar layout
+    # assumed by stock openpilot. This keeps the custom branch usable on older cars.
+    ret.flags |= ToyotaFlags.SINGLE_CAN.value
+
     ret.steerActuatorDelay = 0.12  # Default delay, Prius has larger delay
     ret.steerLimitTimer = 0.4
     ret.stoppingControl = False  # Toyota starts braking more when it thinks you want to stop
 
     stop_and_go = False
+    center_to_front_ratio = 0.44
 
     if candidate == CAR.PRIUS:
       stop_and_go = True
@@ -60,6 +65,18 @@ class CarInterface(CarInterfaceBase):
       tire_stiffness_factor = 0.444  # not optimized yet
       ret.mass = 2860. * CV.LB_TO_KG + STD_CARGO_KG  # mean between normal and hybrid
       set_lat_tune(ret.lateralTuning, LatTunes.PID_A)
+
+      # Keep Corolla CAN/ECU identity while tuning dynamics toward Odyssey-like behavior.
+      # This is for legacy conversions that use Corolla steering/CAN hardware in older vehicles.
+      if ret.flags & ToyotaFlags.SINGLE_CAN.value:
+        ret.wheelbase = 3.00
+        ret.steerRatio = 14.35
+        tire_stiffness_factor = 0.82
+        ret.mass = 4471. * CV.LB_TO_KG + STD_CARGO_KG
+        center_to_front_ratio = 0.41
+        ret.steerActuatorDelay = 0.10
+        ret.lateralTuning.pid.kpV = [0.28]
+        ret.lateralTuning.pid.kiV = [0.08]
 
     elif candidate in (CAR.LEXUS_RX, CAR.LEXUS_RXH, CAR.LEXUS_RX_TSS2, CAR.LEXUS_RXH_TSS2):
       stop_and_go = True
@@ -196,7 +213,7 @@ class CarInterface(CarInterfaceBase):
       set_lat_tune(ret.lateralTuning, LatTunes.PID_J)
 
     ret.steerRateCost = 1.
-    ret.centerToFront = ret.wheelbase * 0.44
+    ret.centerToFront = ret.wheelbase * center_to_front_ratio
 
     # TODO: get actual value, for now starting with reasonable value for
     # civic and scaling by mass and wheelbase
@@ -242,7 +259,8 @@ class CarInterface(CarInterfaceBase):
 
     ret = self.CS.update(self.cp, self.cp_cam)
 
-    ret.canValid = self.cp.can_valid and self.cp_cam.can_valid
+    single_can = bool(self.CP.flags & ToyotaFlags.SINGLE_CAN.value)
+    ret.canValid = self.cp.can_valid if single_can else (self.cp.can_valid and self.cp_cam.can_valid)
     ret.steeringRateLimited = self.CC.steer_rate_limited if self.CC is not None else False
 
     # events

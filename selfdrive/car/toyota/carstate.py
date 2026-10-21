@@ -27,6 +27,7 @@ class CarState(CarStateBase):
     self.acc_type = 1
 
   def update(self, cp, cp_cam):
+    single_can = bool(self.CP.flags & ToyotaFlags.SINGLE_CAN.value)
     ret = car.CarState.new_message()
 
     ret.doorOpen = any([cp.vl["BODY_CONTROL_STATE"]["DOOR_OPEN_FL"], cp.vl["BODY_CONTROL_STATE"]["DOOR_OPEN_FR"],
@@ -113,7 +114,7 @@ class CarState(CarStateBase):
     ret.cruiseState.nonAdaptive = cp.vl["PCM_CRUISE"]["CRUISE_STATE"] in (1, 2, 3, 4, 5, 6)
 
     ret.genericToggle = bool(cp.vl["LIGHT_STALK"]["AUTO_HIGH_BEAM"])
-    ret.stockAeb = bool(cp_cam.vl["PRE_COLLISION"]["PRECOLLISION_ACTIVE"] and cp_cam.vl["PRE_COLLISION"]["FORCE"] < -1e-5)
+    ret.stockAeb = False if single_can else bool(cp_cam.vl["PRE_COLLISION"]["PRECOLLISION_ACTIVE"] and cp_cam.vl["PRE_COLLISION"]["FORCE"] < -1e-5)
 
     ret.espDisabled = cp.vl["ESP_CONTROL"]["TC_DISABLED"] != 0
     # 2 is standby, 10 is active. TODO: check that everything else is really a faulty state

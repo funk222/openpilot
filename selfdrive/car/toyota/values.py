@@ -22,6 +22,7 @@ class CarControllerParams:
 
 class ToyotaFlags(IntFlag):
   HYBRID = 1
+  SINGLE_CAN = 2
 
 
 class CAR:

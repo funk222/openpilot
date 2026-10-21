@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 from opendbc.can.parser import CANParser
 from cereal import car
-from selfdrive.car.toyota.values import NO_DSU_CAR, DBC, TSS2_CAR
+from selfdrive.car.toyota.values import NO_DSU_CAR, DBC, TSS2_CAR, ToyotaFlags
 from selfdrive.car.interfaces import RadarInterfaceBase
 
 
@@ -43,9 +43,9 @@ class RadarInterface(RadarInterfaceBase):
     self.trigger_msg = self.RADAR_B_MSGS[-1]
     self.updated_messages = set()
 
-    # No radar dbc for cars without DSU which are not TSS 2.0
-    # TODO: make a adas dbc file for dsu-less models
-    self.no_radar = CP.carFingerprint in NO_DSU_CAR and CP.carFingerprint not in TSS2_CAR
+    # No radar dbc for cars without DSU which are not TSS 2.0.
+    # Custom single-CAN Toyota builds also skip radar gating while the camera/radar bus layout is being adapted.
+    self.no_radar = (CP.carFingerprint in NO_DSU_CAR and CP.carFingerprint not in TSS2_CAR) or bool(CP.flags & ToyotaFlags.SINGLE_CAN.value)
 
   def update(self, can_strings):
     if self.no_radar:
