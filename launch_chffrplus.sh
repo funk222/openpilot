@@ -184,6 +184,11 @@ function launch {
   # write tmux scrollback to a file
   tmux capture-pane -pq -S-1000 > /tmp/launch_log
 
+  if [ "$ENABLE_STEERING_WATCH_AUTORUN" = "1" ] && [ -f "$DIR/selfdrive/debug/run_steering_watch.sh" ]; then
+    bash "$DIR/selfdrive/debug/run_steering_watch.sh" "$STEERING_WATCH_DURATION" "$STEERING_WATCH_PRINT_EVERY" \
+      > /tmp/steering_watch_autorun.log 2>&1 || true
+  fi
+
   # start manager
   cd selfdrive/manager
   ./build.py && ./manager.py

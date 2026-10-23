@@ -5,7 +5,7 @@ from selfdrive.car.toyota.toyotacan import create_steer_command, create_ui_comma
                                            create_accel_command, create_acc_cancel_command, \
                                            create_fcw_command, create_lta_steer_command
 from selfdrive.car.toyota.values import CAR, STATIC_DSU_MSGS, NO_STOP_TIMER_CAR, TSS2_CAR, \
-                                        MIN_ACC_SPEED, PEDAL_TRANSITION, CarControllerParams
+                                        MIN_ACC_SPEED, PEDAL_TRANSITION, CarControllerParams, ToyotaFlags
 from opendbc.can.packer import CANPacker
 VisualAlert = car.CarControl.HUDControl.VisualAlert
 
@@ -78,7 +78,12 @@ class CarController():
     # toyota can trace shows this message at 42Hz, with counter adding alternatively 1 and 2;
     # sending it at 100Hz seem to allow a higher rate limit, as the rate limit seems imposed
     # on consecutive messages
-    can_sends.append(create_steer_command(self.packer, apply_steer, apply_steer_req, frame))
+    can_sends.append(create_steer_command(self.packer, apply_steer, apply_steer_req, frame, bus=0))
+    if CS.CP.flags & ToyotaFlags.SINGLE_CAN.value:
+      # Single-CAN custom harnesses often route EPS/steering traffic onto a different bus.
+      # Until the real steering bus is proven, broadcast the LKA command across the likely bus candidates.
+      for bus in (1, 2):
+        can_sends.append(create_steer_command(self.packer, apply_steer, apply_steer_req, frame, bus=bus))
     if frame % 2 == 0 and CS.CP.carFingerprint in TSS2_CAR:
       can_sends.append(create_lta_steer_command(self.packer, 0, 0, frame // 2))
 

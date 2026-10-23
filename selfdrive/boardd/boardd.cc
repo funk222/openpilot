@@ -71,7 +71,6 @@ static std::string get_time_str(const struct tm &time) {
 bool check_all_connected(const std::vector<Panda *> &pandas) {
   for (const auto& panda : pandas) {
     if (!panda->connected) {
-      do_exit = true;
       return false;
     }
   }
@@ -613,25 +612,35 @@ void boardd_main_thread(std::vector<std::string> serials) {
   if (serials.size() == 0) serials.push_back("");
 
   PubMaster pm({"pandaStates", "peripheralState"});
-  LOGW("attempting to connect");
 
-  // connect to all provided serials
-  std::vector<Panda *> pandas;
-  for (int i = 0; i < serials.size() && !do_exit; /**/) {
-    Panda *p = usb_connect(serials[i], i);
-    if (!p) {
-      // send empty pandaState & peripheralState and try again
-      send_empty_panda_state(&pm);
-      send_empty_peripheral_state(&pm);
+  while (!do_exit) {
+    LOGW("attempting to connect");
+
+    // connect to all provided serials
+    std::vector<Panda *> pandas;
+    for (int i = 0; i < serials.size() && !do_exit; /**/) {
+      Panda *p = usb_connect(serials[i], i);
+      if (!p) {
+        // send empty pandaState & peripheralState and try again
+        send_empty_panda_state(&pm);
+        send_empty_peripheral_state(&pm);
+        util::sleep_for(500);
+        continue;
+      }
+
+      pandas.push_back(p);
+      ++i;
+    }
+
+    if (do_exit) {
+      break;
+    }
+
+    if (pandas.empty()) {
       util::sleep_for(500);
       continue;
     }
 
-    pandas.push_back(p);
-    ++i;
-  }
-
-  if (!do_exit) {
     LOGW("connected to board");
     Panda *peripheral_panda = pandas[0];
     std::vector<std::thread> threads;
@@ -646,10 +655,16 @@ void boardd_main_thread(std::vector<std::string> serials) {
     threads.emplace_back(can_recv_thread, pandas);
 
     for (auto &t : threads) t.join();
-  }
 
-  // we have exited, clean up pandas
-  for (Panda *panda : pandas) {
-    delete panda;
+    // connection lost; clean up and reconnect automatically
+    for (Panda *panda : pandas) {
+      delete panda;
+    }
+    pandas.clear();
+
+    if (!do_exit) {
+      LOGW("panda disconnected, retrying reconnect loop");
+      util::sleep_for(500);
+    }
   }
 }

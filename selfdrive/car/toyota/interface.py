@@ -239,7 +239,8 @@ class CarInterface(CarInterfaceBase):
 
     # min speed to enable ACC. if car can do stop and go, then set enabling speed
     # to a negative value, so it won't matter.
-    ret.minEnableSpeed = -1. if (stop_and_go or ret.enableGasInterceptor) else MIN_ACC_SPEED
+    # For custom single-CAN conversions we also disable this gate to avoid false low-speed lockout.
+    ret.minEnableSpeed = -1. if (stop_and_go or ret.enableGasInterceptor or (ret.flags & ToyotaFlags.SINGLE_CAN.value)) else MIN_ACC_SPEED
 
     if ret.enableGasInterceptor:
       set_long_tune(ret.longitudinalTuning, LongTunes.PEDAL)

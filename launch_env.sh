@@ -40,4 +40,16 @@ if [ -z "$SKIP_FW_QUERY" ]; then
   export SKIP_FW_QUERY="1"
 fi
 
+if [ -z "$ENABLE_STEERING_WATCH_AUTORUN" ]; then
+  export ENABLE_STEERING_WATCH_AUTORUN="1"
+fi
+
+if [ -z "$STEERING_WATCH_DURATION" ]; then
+  export STEERING_WATCH_DURATION="5400"
+fi
+
+if [ -z "$STEERING_WATCH_PRINT_EVERY" ]; then
+  export STEERING_WATCH_PRINT_EVERY="1.0"
+fi
+
 export STAGING_ROOT="/data/safe_staging"
