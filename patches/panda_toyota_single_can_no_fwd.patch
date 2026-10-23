@@ -1,0 +1,16 @@
+diff --git a/board/safety/safety_toyota.h b/board/safety/safety_toyota.h
+index 648d10d7..b10ed367 100644
+--- a/board/safety/safety_toyota.h
++++ b/board/safety/safety_toyota.h
+@@ -261,7 +261,10 @@ static int toyota_fwd_hook(int bus_num, CANPacket_t *to_fwd) {
+   int bus_fwd = -1;
+ 
+   if (bus_num == 0) {
+-    bus_fwd = 2;
++    // Single-CAN bench (grey panda, no forward-facing camera on bus 2):
++    // forwarding bus0 -> bus2 jams CAN2 TX (frames never ACKed) and stalls bus0 TX,
++    // so openpilot 0x2E4 never reaches the EPS. Disable this forward.
++    bus_fwd = -1;
+   }
+ 
+   if (bus_num == 2) {

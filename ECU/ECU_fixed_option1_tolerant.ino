@@ -87,6 +87,16 @@ boolean auto_engaged_done = false;  // 一次性自动 engage 标志
 unsigned long rx_any_count = 0;     // 收到任意 CAN 帧的总数（验证 RX 是否工作）
 unsigned long rx_2e4_count = 0;     // 收到 openpilot 0x2E4 的总数
 
+// 诊断：记录 Arduino 到底从总线上收到过哪些关键地址（用于区分
+// "0x2E4 根本没上总线" 还是 "固件 RX 漏读"）。
+boolean ever_2e4 = false;           // 收到过 openpilot 0x2E4 STEERING_LKA
+boolean ever_25 = false;            // 收到过真实 EPS 的 0x25 STEER_ANGLE_SENSOR
+boolean ever_260 = false;           // 收到过真实 EPS 的 0x260 STEER_TORQUE_SENSOR
+boolean ever_262 = false;           // 收到过真实 EPS 的 0x262 EPS_STATUS
+boolean ever_343 = false;           // 收到过 openpilot 的 0x343 ACC_CONTROL（判定 panda bus0 TX 是否出得去）
+boolean ever_412 = false;           // 收到过 openpilot 的 0x412（同上，另一条 openpilot TX）
+volatile uint16_t last_rx_id = 0;   // 最近一次收到的帧 ID
+
 unsigned long can_tx_fail_count = 0;
 
 boolean OP_ON = false;
@@ -144,18 +154,50 @@ void can_send_8(uint16_t addr, const uint8_t *dat) {
   CAN.beginPacket(addr);
   CAN.write(dat, 8);
   if (!CAN.endPacket()) can_tx_fail_count++;
+  pump_rx();
 }
 
 void can_send_n(uint16_t addr, const uint8_t *dat, uint8_t len) {
   CAN.beginPacket(addr);
   CAN.write(dat, len);
   if (!CAN.endPacket()) can_tx_fail_count++;
+  pump_rx();
 }
 
 uint8_t toyota_checksum(uint8_t *dat, uint8_t len, uint16_t addr) {
   uint16_t checksum = ((addr & 0xFF00) >> 8) + (addr & 0x00FF) + len + 1;
   for (int i = 0; i < len; i++) checksum += dat[i];
   return (uint8_t)(checksum & 0xFF);
+}
+
+// 读空 MCP2515 的 RX 缓冲（最多 N 帧/次），解析 openpilot 的 0x2E4 并记录诊断。
+// 关键：MCP2515 只有两级 RX 缓冲，总线繁忙（~500 帧/秒）时必须在每次 TX 之间
+// 频繁调用本函数，否则缓冲溢出会把 0x2E4 等帧整类丢光。
+void pump_rx() {
+  for (uint8_t rxi = 0; rxi < 16; rxi++) {
+    int rx_size = CAN.parsePacket();
+    if (!rx_size) break;
+    long rx_id = CAN.packetId();
+    rx_any_count++;
+    last_rx_id = (uint16_t)rx_id;
+    if (rx_id == 0x2E4) {
+      ever_2e4 = true;
+      if (rx_size >= 1) op_steer_req = ((uint8_t)CAN.read() & 0x01);  // STEER_REQUEST
+      op_last_seen = millis();
+      rx_2e4_count++;
+    } else if (rx_id == 0x25) {
+      ever_25 = true;
+    } else if (rx_id == 0x260) {
+      ever_260 = true;
+    } else if (rx_id == 0x262) {
+      ever_262 = true;
+    } else if (rx_id == 0x343) {
+      ever_343 = true;
+    } else if (rx_id == 0x412) {
+      ever_412 = true;
+    }
+    while (CAN.available()) CAN.read();
+  }
 }
 
 void setup() {
@@ -177,6 +219,8 @@ void setup() {
 
 void loop() {
   unsigned long now = millis();
+
+  pump_rx();
 
   if (now - last_vss_tick >= 100) {
     last_vss_tick = now;
@@ -356,26 +400,24 @@ void loop() {
     hb[6] = (uint8_t)(rx_2e4_count & 0xFF);
     hb[7] = (op_seen_since != 0) ? 1 : 0; // openpilot 是否判定为稳定在线
     can_send_8(0x701, hb);
+
+    // 诊断帧 0x702：上报 Arduino 到底从总线上收到过哪些关键地址，
+    // 用于区分 "0x2E4 根本没上总线" vs "固件 RX 漏读"。
+    uint8_t hb2[8] = {0};
+    hb2[0] = ever_2e4 ? 1 : 0;
+    hb2[1] = ever_25 ? 1 : 0;
+    hb2[2] = ever_260 ? 1 : 0;
+    hb2[3] = ever_262 ? 1 : 0;
+    hb2[4] = ever_343 ? 1 : 0;   // openpilot ACC_CONTROL 收到？
+    hb2[5] = ever_412 ? 1 : 0;   // openpilot 0x412 收到？
+    hb2[6] = (uint8_t)((last_rx_id >> 8) & 0xFF);
+    hb2[7] = (uint8_t)(last_rx_id & 0xFF);
+    can_send_8(0x702, hb2);
   }
 
-  // 解析 openpilot 发来的 0x2E4(STEERING_LKA)：判定 openpilot 是否在线/active。
-  // openpilot 的 controlsd 一旦运行就会以 ~100Hz 持续发 0x2E4（disabled 时 torque=0）。
-  // 解析 openpilot 发来的 0x2E4(STEERING_LKA)：判定 openpilot 是否在线/active。
-  // openpilot 的 controlsd 一旦运行就会以 ~100Hz 持续发 0x2E4（disabled 时 torque=0）。
-  // 每次循环尽量多读几帧，避免 MCP2515 两级 RX 缓冲溢出丢包、也加快自动 engage 计数。
-  for (uint8_t rxi = 0; rxi < 8; rxi++) {
-    int rx_size = CAN.parsePacket();
-    if (!rx_size) break;
-    long rx_id = CAN.packetId();
-    rx_any_count++;
-    if (rx_id == 0x2E4 && rx_size >= 1) {
-      uint8_t b0 = (uint8_t)CAN.read();
-      op_steer_req = (b0 & 0x01);  // STEER_REQUEST：openpilot 是否 active
-      op_last_seen = now;
-      rx_2e4_count++;
-    }
-    while (CAN.available()) CAN.read();
-  }
+  // openpilot 的 0x2E4 解析已移到 pump_rx()，并在每次 TX 后及 loop 顶部调用，
+  // 避免 MCP2515 两级 RX 缓冲在繁忙总线上溢出而整类丢掉 0x2E4。
+  pump_rx();
 
   // 维护 openpilot 在线状态（供自动 engage 去抖使用）
   if (op_last_seen != 0 && (now - op_last_seen) < OP_ALIVE_TIMEOUT_MS) {
