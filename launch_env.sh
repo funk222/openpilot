@@ -36,6 +36,12 @@ if [ -z "$FINGERPRINT" ]; then
   export FINGERPRINT="TOYOTA COROLLA 2017"
 fi
 
+# Vehicle profile selects the lateral/vehicle dynamics inside the single-CAN
+# Corolla branch of interface.py. This branch (0814E350) targets a Ford E350.
+if [ -z "$VEHICLE_PROFILE" ]; then
+  export VEHICLE_PROFILE="E350"
+fi
+
 if [ -z "$SKIP_FW_QUERY" ]; then
   export SKIP_FW_QUERY="1"
 fi
