@@ -70,7 +70,11 @@ class CarInterface(CarInterfaceBase):
       # This is for legacy conversions that use Corolla steering/CAN hardware in older vehicles.
       if ret.flags & ToyotaFlags.SINGLE_CAN.value:
         ret.wheelbase = 3.00
-        ret.steerRatio = 14.35
+        # Static default aligned to the value learned by liveParameters during a
+        # known-good drive (effective steerRatio ~18.83, angle offset ~-7deg, PID
+        # kp=0.28 ki=0.08). Starting here keeps behavior near-optimal even if the
+        # persisted LiveParameters get wiped; paramsd still refines it online.
+        ret.steerRatio = 18.8
         tire_stiffness_factor = 0.82
         ret.mass = 4471. * CV.LB_TO_KG + STD_CARGO_KG
         center_to_front_ratio = 0.41
