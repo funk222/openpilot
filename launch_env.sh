@@ -41,7 +41,7 @@ if [ -z "$SKIP_FW_QUERY" ]; then
 fi
 
 if [ -z "$ENABLE_STEERING_WATCH_AUTORUN" ]; then
-  export ENABLE_STEERING_WATCH_AUTORUN="1"
+  export ENABLE_STEERING_WATCH_AUTORUN="0"
 fi
 
 if [ -z "$STEERING_WATCH_DURATION" ]; then
