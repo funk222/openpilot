@@ -55,6 +55,22 @@ class CarController():
     else:
       apply_steer_req = 1
 
+    # --- bench steer actuation test (gated by /tmp/steer_test_amp; OFF unless file exists) ---
+    # Writes a bounded triangle-wave torque so we can verify whether the real EPS actuates
+    # at standstill. Hard-clamped to +/-500. Remove the file to stop immediately.
+    if active and apply_steer_req:
+      try:
+        with open('/tmp/steer_test_amp') as _f:
+          _amp = int(float(_f.read().strip() or '0'))
+        _amp = max(-500, min(500, _amp))
+        if _amp != 0:
+          _phase = (frame % 1200) / 1200.0
+          _tri = 4.0 * abs(_phase - 0.5) - 1.0
+          _target = int(_amp * _tri)
+          apply_steer = apply_toyota_steer_torque_limits(_target, self.last_steer, CS.out.steeringTorqueEps, CarControllerParams)
+      except (OSError, ValueError):
+        pass
+
     # TODO: probably can delete this. CS.pcm_acc_status uses a different signal
     # than CS.cruiseState.enabled. confirm they're not meaningfully different
     if not enabled and CS.pcm_acc_status:

@@ -194,7 +194,11 @@ class Controls:
       return
 
     self.events.add_from_msg(CS.events)
-    self.events.add_from_msg(self.sm['driverMonitoringState'].events)
+    # Driver-monitoring events can be suppressed on bench/custom hardware that has no
+    # working driver camera. Gated by env var or a persistent flag file so it is opt-in
+    # and survives openpilot's launcher resetting the process environment.
+    if os.getenv("SUPPRESS_DRIVER_MONITORING") != "1" and not os.path.exists("/data/suppress_driver_monitoring"):
+      self.events.add_from_msg(self.sm['driverMonitoringState'].events)
 
     # Create events for battery, temperature, disk space, and memory
     if EON and (self.sm['peripheralState'].pandaType != PandaType.uno) and \
@@ -617,7 +621,7 @@ class Controls:
       self.pm.send('sendcan', can_list_to_can_capnp(can_sends, msgtype='sendcan', valid=CS.canValid))
       CC.actuatorsOutput = self.last_actuators
 
-    force_decel = (self.sm['driverMonitoringState'].awarenessStatus < 0.) or \
+    force_decel = ((os.getenv("SUPPRESS_DRIVER_MONITORING") != "1" and not os.path.exists("/data/suppress_driver_monitoring")) and self.sm['driverMonitoringState'].awarenessStatus < 0.) or \
                   (self.state == State.softDisabling)
 
     # Curvature & Steering angle
