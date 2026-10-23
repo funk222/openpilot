@@ -70,14 +70,18 @@ const bool EMIT_FAKE_EPS_STATUS = false;
 // 自动制造一次 CRUISE_ACTIVE 的 0->1 跳变来触发 engage，省去每次手动按 MAIN。
 // 关键：panda 的 controls_allowed 是上升沿锁存，开机必须先是 0、再跳到 1 才能锁住。
 //
-// 当前默认关闭(手动按 MAIN engage)：实测发现自动 engage 可能在 EPS 刚上电/
-// 处于故障态时就发转向命令，而这台非标 Corolla EPS 若在"LKA 命令进行中"被打火
-// 硬断电会латch 故障 LKA_STATE=17(见 md/调试总结)。手动挂上让驾驶员先确认 EPS
-// 健康(standby)。待实现"智能门控自动 engage"(等 EPS 报健康态再挂)后可再开启。
-const bool AUTO_ENGAGE_ON_OP = false;
+// 智能门控自动 engage：上电后，等「openpilot 就绪(总线上持续收到 0x2E4)」且
+// 「真实 EPS 处于健康 standby(LKA_STATE==EPS_READY_LKA_STATE) 并稳定 ≥
+// AUTO_ENGAGE_EPS_READY_MS」后，才一次性制造 CRUISE_ACTIVE 的 0->1 跳变挂上。
+// 这样可避免对「刚上电/故障态(如打火硬断电后латch 的 LKA_STATE=17)」的 EPS 发命令：
+//  - 冷启动 EPS 干净到 standby(1) -> 自动挂上；
+//  - 热重启未 CANCEL 导致 EPS=17 -> eps_ready 永不成立 -> 不会自动挂(正确)。
+const bool AUTO_ENGAGE_ON_OP = true;
 const unsigned long OP_ALIVE_TIMEOUT_MS = 500;    // 多久没看到 0x2E4 视为 openpilot 掉线
 const unsigned long AUTO_ENGAGE_STABLE_MS = 2000; // （保留）openpilot 稳定在线多久
-const unsigned long AUTO_ENGAGE_MIN_2E4 = 40;     // 累计收到多少帧 0x2E4 后自动 engage
+const unsigned long AUTO_ENGAGE_MIN_2E4 = 40;     // 累计收到多少帧 0x2E4 视为 openpilot 就绪
+const uint8_t EPS_READY_LKA_STATE = 1;            // 这台非标 EPS 的健康 standby 码(实测=1)
+const unsigned long AUTO_ENGAGE_EPS_READY_MS = 3000; // EPS 连续处于 standby 多久才允许挂
 
 // 模拟车速：台架测试 EPS 是否因无车速才不执行 LKA 时使用。
 // 开启后 WHEEL_SPEEDS 输出固定车速。真实车辆上务必保持 false！
@@ -101,6 +105,9 @@ boolean ever_262 = false;           // 收到过真实 EPS 的 0x262 EPS_STATUS
 boolean ever_343 = false;           // 收到过 openpilot 的 0x343 ACC_CONTROL（判定 panda bus0 TX 是否出得去）
 boolean ever_412 = false;           // 收到过 openpilot 的 0x412（同上，另一条 openpilot TX）
 volatile uint16_t last_rx_id = 0;   // 最近一次收到的帧 ID
+
+uint8_t eps_lka_state = 0xFF;       // 真实 EPS 0x262 的 LKA_STATE(7位解码)；0xFF=未知
+unsigned long eps_ready_since = 0;  // EPS 连续处于健康 standby 的起始时间(0=当前不健康)
 
 unsigned long can_tx_fail_count = 0;
 
@@ -196,6 +203,20 @@ void pump_rx() {
       ever_260 = true;
     } else if (rx_id == 0x262) {
       ever_262 = true;
+      // 解码真实 EPS LKA_STATE(EPS_STATUS 31|7@0+ => (byte3>>1)&0x7F)，
+      // 并维护「连续处于健康 standby」计时，供智能门控自动 engage 使用。
+      if (rx_size >= 4) {
+        (void)CAN.read();                      // byte0
+        (void)CAN.read();                      // byte1
+        (void)CAN.read();                      // byte2
+        uint8_t b3 = (uint8_t)CAN.read();      // byte3 含 LKA_STATE
+        eps_lka_state = (b3 >> 1) & 0x7F;
+        if (eps_lka_state == EPS_READY_LKA_STATE) {
+          if (eps_ready_since == 0) eps_ready_since = millis();
+        } else {
+          eps_ready_since = 0;                 // 非 standby(故障/active) -> 复位计时
+        }
+      }
     } else if (rx_id == 0x343) {
       ever_343 = true;
     } else if (rx_id == 0x412) {
@@ -288,12 +309,15 @@ void loop() {
     btn_cancel_last = btn_cancel;
   }
 
-  // 自动 engage：收到足够多的 openpilot 0x2E4（证明 openpilot+boardd 已在运行，
-  // 且已收过我们的 CRUISE_ACTIVE=0），当前未挂、无刹车/油门时一次性触发。
-  // 用累计帧数而非连续时间窗，避免主循环慢导致的间隔抖动把计时清零。
+  // 智能门控自动 engage：openpilot 就绪(累计收到足够 0x2E4) 且 真实 EPS 已连续处于
+  // 健康 standby(LKA_STATE==1) 稳定 ≥ AUTO_ENGAGE_EPS_READY_MS，当前未挂、无刹车/油门
+  // 时一次性触发。EPS 处于故障(如打火后латch 的 17)时 eps_ready_since 恒为 0 -> 不会自动挂。
+  boolean eps_ready = (eps_ready_since != 0) &&
+                      ((millis() - eps_ready_since) >= AUTO_ENGAGE_EPS_READY_MS);
   if (AUTO_ENGAGE_ON_OP && !auto_engaged_done && !OP_ON &&
       !BRAKE_PRESSED && GAS_RELEASED &&
-      rx_2e4_count >= AUTO_ENGAGE_MIN_2E4) {
+      rx_2e4_count >= AUTO_ENGAGE_MIN_2E4 &&
+      eps_ready) {
     OP_ON = true;
     set_speed = clamp_set_speed(get_ui_speed_kph() + 3.0f);
     auto_engaged_done = true;
@@ -406,8 +430,8 @@ void loop() {
     hb[7] = (op_seen_since != 0) ? 1 : 0; // openpilot 是否判定为稳定在线
     can_send_8(0x701, hb);
 
-    // 诊断帧 0x702：上报 Arduino 到底从总线上收到过哪些关键地址，
-    // 用于区分 "0x2E4 根本没上总线" vs "固件 RX 漏读"。
+    // 诊断帧 0x702：上报 Arduino 收到过哪些关键地址，以及真实 EPS 当前状态与
+    // 自动 engage 门控是否就绪。
     uint8_t hb2[8] = {0};
     hb2[0] = ever_2e4 ? 1 : 0;
     hb2[1] = ever_25 ? 1 : 0;
@@ -415,8 +439,9 @@ void loop() {
     hb2[3] = ever_262 ? 1 : 0;
     hb2[4] = ever_343 ? 1 : 0;   // openpilot ACC_CONTROL 收到？
     hb2[5] = ever_412 ? 1 : 0;   // openpilot 0x412 收到？
-    hb2[6] = (uint8_t)((last_rx_id >> 8) & 0xFF);
-    hb2[7] = (uint8_t)(last_rx_id & 0xFF);
+    hb2[6] = eps_lka_state;      // 真实 EPS LKA_STATE(7位解码)：1=standby 5=active 17=fault
+    hb2[7] = ((eps_ready_since != 0) &&
+              ((millis() - eps_ready_since) >= AUTO_ENGAGE_EPS_READY_MS)) ? 1 : 0; // 门控就绪
     can_send_8(0x702, hb2);
   }
 
