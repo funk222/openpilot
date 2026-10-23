@@ -69,7 +69,12 @@ const bool EMIT_FAKE_EPS_STATUS = false;
 // 自动 engage：检测到 openpilot（总线上出现 0x2E4 STEERING_LKA）稳定运行后，
 // 自动制造一次 CRUISE_ACTIVE 的 0->1 跳变来触发 engage，省去每次手动按 MAIN。
 // 关键：panda 的 controls_allowed 是上升沿锁存，开机必须先是 0、再跳到 1 才能锁住。
-const bool AUTO_ENGAGE_ON_OP = true;
+//
+// 当前默认关闭(手动按 MAIN engage)：实测发现自动 engage 可能在 EPS 刚上电/
+// 处于故障态时就发转向命令，而这台非标 Corolla EPS 若在"LKA 命令进行中"被打火
+// 硬断电会латch 故障 LKA_STATE=17(见 md/调试总结)。手动挂上让驾驶员先确认 EPS
+// 健康(standby)。待实现"智能门控自动 engage"(等 EPS 报健康态再挂)后可再开启。
+const bool AUTO_ENGAGE_ON_OP = false;
 const unsigned long OP_ALIVE_TIMEOUT_MS = 500;    // 多久没看到 0x2E4 视为 openpilot 掉线
 const unsigned long AUTO_ENGAGE_STABLE_MS = 2000; // （保留）openpilot 稳定在线多久
 const unsigned long AUTO_ENGAGE_MIN_2E4 = 40;     // 累计收到多少帧 0x2E4 后自动 engage
