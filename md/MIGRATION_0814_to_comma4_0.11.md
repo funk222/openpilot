@@ -62,19 +62,29 @@ angleOffset(学习)    ~ -6.5 ~ -7.0 deg（paramsd 在线学，不用静态给�
   - carcontroller：转向只发 CAN0（见 2.4）
   - radar_interface：单 CAN 关掉 radar gating
 
-### 2.4 panda 转发 jam 修复（bus0→bus2）— ⏳ 必做，需实机定位
+### 2.4 panda 转发 jam 修复（bus0→bus2）— ✅ 已确认：0.11.x 很可能不需要
 - 0.8.14 根因：Toyota 安全把 bus0 每帧转发到 bus2（摄像头），单 CAN 无 bus2 → TX 堵死。
   修复：`panda/board/safety/safety_toyota.h` 的 `toyota_fwd_hook` 把 `bus_num==0` 的 `bus_fwd=2` 改 `-1`。
-- comma 4：**内置现代 panda**，`safety_toyota.h` 逻辑类似但 CAN 编号/harness 行为不同。
-  comma 4 的 harness 本就把 CAN2=摄像头、CAN0=车分开，**单 CAN（无摄像头）下是否仍有同样的转发 jam，必须实机确认**。
-- **行动**：⏳ comma 4 到手后，先不打补丁跑一次，看 `canFwdErrs` 是否爆 + 转向能否到 EPS；
-  若复现，再在 comma 4 的 panda 固件做等价的"单 CAN 不转发"补丁（out-of-tree patch，同 0814 做法）。
+- **0.11.x 实况（已查证）**：safety 代码搬到 `opendbc/safety/modes/toyota.h`，且 **`toyota_hooks` 已没有
+  `.fwd` 转发钩子**（0.8.14 有 `.fwd = toyota_fwd_hook`，0.11.x 删了）。也就是说**固件层不再强制
+  bus0→bus2 转发**，0814 的那个 TX jam 根因在 0.11.x 固件层很可能根本不存在。转发现在由 harness box
+  硬件继电器 + boardd 软件层处理。
+- **行动**：⏳ comma 4 到手后先**不打任何 panda 补丁**跑一次，看 `canFwdErrs` / 转向能否到 EPS。
+  只有在实测仍复现 jam 时才需要动 boardd/harness 层（而非固件 fwd hook）。**预计不需要补丁。**
 
-### 2.5 非标 EPS 的 LKA_STATE 处理（允许 3，打火-17 预防）— ✅ 逻辑可复用
+### 2.5 非标 EPS 的 LKA_STATE 处理（允许 3，打火-17 预防）— ✅ 已完成
 - 0.8.14：`single_can` 下 `steerWarning = lka_state not in (1,3,5)`（允许非标 3）。
 - 打火-17：EPS 在 STEER_REQUEST=1 时硬断电会латch 故障 17；预防=打火前 CANCEL，恢复=干净长断电。
-- **0.11.x 落点**：`opendbc/car/toyota/carstate.py` 的 EPS_STATUS/steerFault 判定处，重做单 CAN 允许列表。
-- ⏳ 实机：这台非标 EPS 的码（1/3/5/17）在 comma 4 上应一致（EPS 没变），但代码位置要重找。
+- **0.11.x 实况（已查证）**：`carstate.py` 用 `TEMP_STEER_FAULTS=(0,9,11,21,25)` 和
+  **`PERM_STEER_FAULTS=(3,17)`** 判故障 —— 你这台非标 EPS 的 **3 和 17 在 0.11.x 被当成永久故障**（更严）。
+- **已改（011ODY）**：`carstate.py` 在 `SINGLE_CAN` flag 下特判：
+  `steerFaultTemporary = lka_state in (0,9,11,17,21,25)`（17 降级为临时/软退出，因可恢复），
+  `steerFaultPermanent = False`（3/5/1 视为健康）。
+- ⏳ 实机：确认这台 EPS 在 comma4 上报的码仍是 1/3/5/17（EPS 没换，应一致）。
+
+### 2.5b carcontroller 转向发送总线 — ✅ 已确认：无需改
+- 0.11.x 的 `toyotacan.create_steer_command` 已写死 `make_can_msg("STEERING_LKA", 0, ...)` → 只发 bus 0。
+  正是单 CAN 需要的，**不用改**（0.8.14 曾错误双发 bus0+bus1，0.11.x 原生就只 bus0）。
 
 ### 2.6 指纹 / 启动绕过 — ⚠️ 大部分不再需要
 - 0.8.14 用了：`FINGERPRINT` 强制、`SKIP_FW_QUERY`、NEOS 绕过、无 LFS、grey→black 伪装、相机/DM/非官方硬件告警抑制。
