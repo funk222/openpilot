@@ -284,7 +284,13 @@ class Controls:
       self.logged_comm_issue = False
 
     if not self.sm['liveParameters'].valid:
-      self.events.add(EventName.vehicleModelInvalid)
+      # Single-CAN conversions lack reliable localizer/yaw sensor fusion, so paramsd's
+      # online learning can go invalid while driving and raise a bogus soft-disable
+      # ("Vehicle Parameter Identification Failed"). The known-good steerRatio is already
+      # baked into the static CarParams, so this learning is not required. Suppress via a
+      # persistent file switch (same pattern as /data/suppress_driver_monitoring).
+      if not os.path.exists("/data/suppress_vehicle_model_invalid"):
+        self.events.add(EventName.vehicleModelInvalid)
     if not self.sm['lateralPlan'].mpcSolutionValid:
       self.events.add(EventName.plannerError)
     if not self.sm['liveLocationKalman'].sensorsOK and not NOSENSOR:
