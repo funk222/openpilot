@@ -63,13 +63,16 @@ void Sidebar::updateState(const UIState &s) {
   }
   setProperty("connectStatus", QVariant::fromValue(connectStatus));
 
-  ItemStatus tempStatus = {"TEMP\nHIGH", danger_color};
-  auto ts = deviceState.getThermalStatus();
-  if (ts == cereal::DeviceState::ThermalStatus::GREEN) {
-    tempStatus = {"TEMP\nGOOD", good_color};
-  } else if (ts == cereal::DeviceState::ThermalStatus::YELLOW) {
-    tempStatus = {"TEMP\nOK", warning_color};
+  // Show the EON battery percentage in place of the thermal label so it's visible
+  // on screen (useful on OBD-powered single-CAN rigs that run on battery when off).
+  int batteryPercent = (int)deviceState.getBatteryPercent();
+  QColor battColor = good_color;
+  if (batteryPercent <= 20) {
+    battColor = danger_color;
+  } else if (batteryPercent <= 50) {
+    battColor = warning_color;
   }
+  ItemStatus tempStatus = {QString("BATTERY\n%1%").arg(batteryPercent), battColor};
   setProperty("tempStatus", QVariant::fromValue(tempStatus));
 
   ItemStatus pandaStatus = {"VEHICLE\nONLINE", good_color};
