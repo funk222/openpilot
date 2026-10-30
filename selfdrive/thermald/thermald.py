@@ -412,7 +412,10 @@ def thermald_thread(end_event, hw_queue):
       discharging = msg.deviceState.batteryCurrent > 0  # positive raw current => no external power
       if not discharging:
         power_lost_ts = None
-        set_offroad_alert_if_changed("Offroad_ShutdownImminent", False)
+        try:
+          set_offroad_alert_if_changed("Offroad_ShutdownImminent", False)
+        except Exception:
+          pass
       else:
         if power_lost_ts is None:
           power_lost_ts = sec_since_boot()
@@ -424,8 +427,11 @@ def thermald_thread(end_event, hw_queue):
         if started_seen:
           remaining = int(round(delay_s - (sec_since_boot() - power_lost_ts)))
           if remaining > 0:
-            # show a live countdown on the offroad UI
-            set_offroad_alert_if_changed("Offroad_ShutdownImminent", True, f"{remaining}s")
+            # show a live countdown on the offroad UI (never let a params/alert issue crash thermald)
+            try:
+              set_offroad_alert_if_changed("Offroad_ShutdownImminent", True, f"{remaining}s")
+            except Exception:
+              pass
           else:
             cloudlog.warning(f"external power lost for >{delay_s}s, shutting down")
             params.put_bool("DoShutdown", True)
