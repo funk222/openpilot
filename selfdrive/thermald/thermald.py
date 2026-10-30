@@ -412,6 +412,7 @@ def thermald_thread(end_event, hw_queue):
       discharging = msg.deviceState.batteryCurrent > 0  # positive raw current => no external power
       if not discharging:
         power_lost_ts = None
+        set_offroad_alert_if_changed("Offroad_ShutdownImminent", False)
       else:
         if power_lost_ts is None:
           power_lost_ts = sec_since_boot()
@@ -420,9 +421,14 @@ def thermald_thread(end_event, hw_queue):
         except (OSError, ValueError):
           delay_s = 30.0
         # only after we've actually been running (avoid shutting down during boot)
-        if started_seen and (sec_since_boot() - power_lost_ts) > delay_s:
-          cloudlog.warning(f"external power lost for >{delay_s}s, shutting down")
-          params.put_bool("DoShutdown", True)
+        if started_seen:
+          remaining = int(round(delay_s - (sec_since_boot() - power_lost_ts)))
+          if remaining > 0:
+            # show a live countdown on the offroad UI
+            set_offroad_alert_if_changed("Offroad_ShutdownImminent", True, f"{remaining}s")
+          else:
+            cloudlog.warning(f"external power lost for >{delay_s}s, shutting down")
+            params.put_bool("DoShutdown", True)
 
     msg.deviceState.chargingError = current_filter.x > 0. and msg.deviceState.batteryPercent < 90  # if current is positive, then battery is being discharged
     msg.deviceState.started = started_ts is not None

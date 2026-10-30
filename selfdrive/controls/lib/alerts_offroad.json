@@ -1,4 +1,8 @@
 {
+  "Offroad_ShutdownImminent": {
+    "text": "Car power lost. Shutting down in ",
+    "severity": 0
+  },
   "Offroad_ChargeDisabled": {
     "text": "EON charging disabled after car being off for more than 30 hours. Turn ignition on to start charging again.",
     "severity": 0
