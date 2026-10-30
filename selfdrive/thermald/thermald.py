@@ -216,6 +216,7 @@ def thermald_thread(end_event, hw_queue):
   started_seen = False
   thermal_status = ThermalStatus.green
   usb_power = True
+  power_lost_ts = None  # when external USB power was lost (ignition off on single-CAN OBD-powered rigs)
 
   last_hw_state = HardwareState(
     network_type=NetworkType.none,
@@ -398,6 +399,30 @@ def thermald_thread(end_event, hw_queue):
     if power_monitor.should_shutdown(peripheralState, onroad_conditions["ignition"], in_car, off_ts, started_seen):
       cloudlog.warning(f"shutting device down, offroad since {off_ts}")
       params.put_bool("DoShutdown", True)
+
+    # Single-CAN rig fast shutdown: the whole device is powered from the car via OBD-II, so once
+    # the ignition is off the device runs on its internal battery (discharging). The stock shutdown
+    # path is gated by in_car (harnessStatus), which is notConnected here, so it never fires.
+    # Instead, shut down a fixed delay after external power is lost, detected via the device-local
+    # raw battery current (batteryCurrent > 0 means discharging; independent of the panda being
+    # powered). We use the raw value (not current_filter, whose 15s time constant is too slow) and
+    # debounce with the delay window itself. Gated by a persistent file switch: create
+    # /data/shutdown_on_power_loss (optionally containing the delay in seconds).
+    if os.path.exists("/data/shutdown_on_power_loss"):
+      discharging = msg.deviceState.batteryCurrent > 0  # positive raw current => no external power
+      if not discharging:
+        power_lost_ts = None
+      else:
+        if power_lost_ts is None:
+          power_lost_ts = sec_since_boot()
+        try:
+          delay_s = float(open("/data/shutdown_on_power_loss").read().strip() or "30")
+        except (OSError, ValueError):
+          delay_s = 30.0
+        # only after we've actually been running (avoid shutting down during boot)
+        if started_seen and (sec_since_boot() - power_lost_ts) > delay_s:
+          cloudlog.warning(f"external power lost for >{delay_s}s, shutting down")
+          params.put_bool("DoShutdown", True)
 
     msg.deviceState.chargingError = current_filter.x > 0. and msg.deviceState.batteryPercent < 90  # if current is positive, then battery is being discharged
     msg.deviceState.started = started_ts is not None
