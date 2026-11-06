@@ -29,10 +29,10 @@ const float VSS_SCALE = (TIRE_CIRCUMFERENCE * 36.0f) / (float)PULSES_PER_REV;
 //   spd_kph = 1.609 * (a*V^2 + b*V), V = analogRead(A4) [0..1023], averaged over
 //   ANALOG_FILTER_WINDOW samples and post-scaled by ANALOG_POST_SCALE (3/40).
 const bool USE_ANALOG_VSS = true;
-const float ANALOG_VSS_A = 0.00008f;   // quadratic term (E350 curve fit)
-const float ANALOG_VSS_B = 0.06f;      // linear term (E350 curve fit)
-const float ANALOG_TO_KPH = 1.609f;    // mph -> kph
-const float ANALOG_POST_SCALE = 3.0f / 40.0f;
+const float ANALOG_VSS_A = 0.00003f;  // quadratic term (matches proven VSS_VOLT_Cruise_ECU)
+const float ANALOG_VSS_B = 0.0816f;   // linear term (matches proven VSS_VOLT_Cruise_ECU)
+const float ANALOG_TO_KPH = 1.60934f; // mph -> kph
+const float ANALOG_POST_SCALE = 1.0f;  // original uses raw 160-sample average, no extra scale
 const bool USE_PEDAL_SWITCH_INPUTS = false;
 
 const byte pinVssInterrupt = 3;
@@ -60,7 +60,7 @@ const float TOYOTA_WHEEL_SPEED_SIGNAL_OFFSET_KPH = 67.67f;
 // - 默认 1.00：按几何参数原始计算
 // - 显示偏高：调小（如 0.96）
 // - 显示偏低：调大（如 1.04）
-const float TOYOTA_WHEEL_SPEED_SCALE = 0.25f;
+const float TOYOTA_WHEEL_SPEED_SCALE = 1.0f;  // E350: no extra scale (Odyssey-only tweak)
 
 // 如果真实 BCM 没有这些报文，保持 true；如果真实 BCM 已经发送，请改成 false
 const bool EMIT_BCM_FALLBACK = true;
