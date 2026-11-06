@@ -75,9 +75,13 @@ class CarInterface(CarInterfaceBase):
         # so the two EONs can back each other up across both vehicles.
         is_e350 = 0x7F1 in fingerprint[0]
         if is_e350:
-          # Ford E350 1997 (old-car conversion). Values from the legacy FordE350 old-car config.
+          # Ford E350 1997 (old-car conversion). The liveParameters learner converged to
+          # about steerRatio ~= 25.687 and angleOffsetAverageDeg ~= -7.12 deg on the working
+          # E350 setup. Lock the learned values in as the static startup defaults so a fresh
+          # reboot or reflash keeps the car on the proven E350 tune without needing to
+          # rediscover the same calibration.
           ret.wheelbase = 4.00
-          ret.steerRatio = 17.0
+          ret.steerRatio = 25.687082290649414
           tire_stiffness_factor = 0.444
           ret.mass = 11500. * CV.LB_TO_KG + STD_CARGO_KG
           center_to_front_ratio = 0.44
