@@ -69,18 +69,36 @@ class CarInterface(CarInterfaceBase):
       # Keep Corolla CAN/ECU identity while tuning dynamics toward Odyssey-like behavior.
       # This is for legacy conversions that use Corolla steering/CAN hardware in older vehicles.
       if ret.flags & ToyotaFlags.SINGLE_CAN.value:
-        ret.wheelbase = 3.00
-        # Static default aligned to the value learned by liveParameters during a
-        # known-good drive (effective steerRatio ~18.83, angle offset ~-7deg, PID
-        # kp=0.28 ki=0.08). Starting here keeps behavior near-optimal even if the
-        # persisted LiveParameters get wiped; paramsd still refines it online.
-        ret.steerRatio = 18.8
-        tire_stiffness_factor = 0.82
-        ret.mass = 4471. * CV.LB_TO_KG + STD_CARGO_KG
-        center_to_front_ratio = 0.41
-        ret.steerActuatorDelay = 0.10
-        ret.lateralTuning.pid.kpV = [0.28]
-        ret.lateralTuning.pid.kiV = [0.08]
+        # Auto-detect which converted car this EON is plugged into from the Arduino ECU's
+        # vehicle-ID beacon frame on bus 0: 0x7F1 = Ford E350, otherwise (0x7F0 or absent) =
+        # Honda Odyssey. This lets one branch/image work in either car with no manual config,
+        # so the two EONs can back each other up across both vehicles.
+        is_e350 = 0x7F1 in fingerprint[0]
+        if is_e350:
+          # Ford E350 1997 (old-car conversion). Values from the legacy FordE350 old-car config.
+          ret.wheelbase = 4.00
+          ret.steerRatio = 17.0
+          tire_stiffness_factor = 0.444
+          ret.mass = 11500. * CV.LB_TO_KG + STD_CARGO_KG
+          center_to_front_ratio = 0.44
+          ret.steerActuatorDelay = 0.12
+          ret.lateralTuning.pid.kpV = [0.9]
+          ret.lateralTuning.pid.kiV = [0.01]
+          ret.lateralTuning.pid.kf = 0.00007818594  # full torque for 20 deg at 80mph
+        else:
+          # Honda Odyssey-like dynamics on Corolla CAN/EPS hardware.
+          # Static default aligned to the value learned by liveParameters during a
+          # known-good drive (effective steerRatio ~18.83, angle offset ~-7deg, PID
+          # kp=0.28 ki=0.08). Starting here keeps behavior near-optimal even if the
+          # persisted LiveParameters get wiped; paramsd still refines it online.
+          ret.wheelbase = 3.00
+          ret.steerRatio = 18.8
+          tire_stiffness_factor = 0.82
+          ret.mass = 4471. * CV.LB_TO_KG + STD_CARGO_KG
+          center_to_front_ratio = 0.41
+          ret.steerActuatorDelay = 0.10
+          ret.lateralTuning.pid.kpV = [0.28]
+          ret.lateralTuning.pid.kiV = [0.08]
 
     elif candidate in (CAR.LEXUS_RX, CAR.LEXUS_RXH, CAR.LEXUS_RX_TSS2, CAR.LEXUS_RXH_TSS2):
       stop_and_go = True

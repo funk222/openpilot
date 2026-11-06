@@ -443,6 +443,12 @@ void loop() {
     hb2[7] = ((eps_ready_since != 0) &&
               ((millis() - eps_ready_since) >= AUTO_ENGAGE_EPS_READY_MS)) ? 1 : 0; // 门控就绪
     can_send_8(0x702, hb2);
+
+    // 车型身份信标 0x7F0 = Honda Odyssey（单 CAN 改装）。EON 的 interface.py 在车辆识别
+    // 阶段用 fingerprint 检测总线上是 0x7F0 还是 0x7F1，自动选横向参数，无需手动配置。
+    // 这样两台 EON 可以互为备份，插到任一辆车都能自动识别。
+    uint8_t vid[8] = {0x4F, 0x44, 0x59, 0, 0, 0, 0, 0};  // "ODY" 标识
+    can_send_8(0x7F0, vid);
   }
 
   // openpilot 的 0x2E4 解析已移到 pump_rx()，并在每次 TX 后及 loop 顶部调用，
